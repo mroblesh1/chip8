@@ -11,6 +11,9 @@ constexpr int SCALE        = 10;
 int main(int argc, char** argv) {
     Chip8 chip8;
     Platform platform("CHIP-8 Emulator", CHIP8_WIDTH * SCALE, CHIP8_HEIGHT * SCALE);
+    
+
+    chip8.loadROM("./ROMs/4-flags.ch8");
 
     bool quit = false;
 

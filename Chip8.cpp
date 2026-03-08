@@ -26,11 +26,12 @@ Chip8::Chip8() {
     instr_count = 0;
     delay_timer = 0;
     sound_timer = 0;
+    key = 0;
 
     // Clear display and registers
     for (int i = 0; i < 2048; ++i) display[i] = false;
     for (int i = 0; i < 16; ++i) V[i] = 0;
-    
+
     // also clear mem just to be safe
     //for (int i = 0; i < 4096; ++i) mem[i] = 0;
 
@@ -41,14 +42,12 @@ int Chip8::initMem() {
     for (int i = 0; i < 80; ++i) {
         mem[0x50 + i] = chars[i];
     }
-
-    loadROM();
     return 0;
 }
 
-int Chip8:: loadROM() {
+int Chip8::loadROM(char* filepath) {
     // Open the file in binary mode and move the cursor to the end immediately
-    std::ifstream file("./ROMs/IBM Logo.ch8", std::ios::binary | std::ios::ate);
+    std::ifstream file(filepath, std::ios::binary | std::ios::ate);
 
     if (file.is_open()) {
         // Get the size of the file and reset the cursor to the beginning
@@ -94,39 +93,218 @@ int Chip8::cycle() {
     // Execute
     switch (type) {
         case 0x0:
-            // 00E0 (clear screen)
-            for (int i = 0; i < 2048; ++i) display[i] = 1;
+        {
+            switch (opcode) {
+                case 0x00E0:
+                    // 00E0: CLS
+                    // Clear the display
+                    for (int i = 0; i < 2048; ++i) display[i] = 0;
+                    break;
+                
+                case 0x00EE:
+                    // 00EE: RET
+                    // Return from subroutine
+
+                    // Pop the stack and set the PC to the popped value
+                    PC = stack.top();
+                    stack.pop();
+                    break;
+            }
             break;
+        }
         
         case 0x1:
-            // 1NNN (jump)
+        {
+            // 1NNN: JP addr
+            // Jump to location at NNN
             PC = NNN;
             break;
+        }
+
+        case 0x2:
+        {
+            // 2NNN: CALL addr
+            // Call Subroutine at NNN
+            stack.push(PC);
+            PC = NNN;
+            break;
+        }
+
+        case 0x3:
+        {
+            // 3XNN: SE Vx, byte
+            // Skip next instruction if V[X] == NN (used to branch)
+            if (V[X] == NN) {
+                ++PC;
+                ++PC;
+            }
+            break;
+        }
+        
+        case 0x4:
+        {
+            // 4XNN: SNE Vx, byte
+            // Skip next instruction if V[X] != NN (used to branch)
+            if (V[X] != NN) {
+                ++PC;
+                ++PC;
+            }
+            break;
+        }
+
+        case 0x5:
+        {
+            // 5XY0: SE Vx, Vy
+            // Skip next instruction if V[X] == V[Y] (used to branch)
+            if (V[X] == V[Y]) {
+                ++PC;
+                ++PC;
+            }
+            break;
+        }
         
         case 0x6:
-            // 6XNN (set register VX)
+        {
+            // 6XNN: LD Vx, byte
+            // Set register VX = NN
             V[X] = NN;
             break;
+        }
 
         case 0x7:
-            // 7XNN (add value to register VX)
+        {
+            // 7XNN: ADD Vx, byte
+            // Add NN to register VX
             V[X] += NN;
             break;
+        }
+        
+        case 0x8:
+        {
+            switch (N) {
+                case 0x0:
+                    // 8XY0: LD Vx, Vy
+                    // Set V[X] = V[Y]
+                    V[X] = V[Y];
+                    break;
+                case 0x1:
+                    // 8XY1: OR Vx, Vy
+                    // Perform bitwise OR on V[X] and V[Y] and store output in V[X]
+                    V[X] |= V[Y];
+                    break;
+                case 0x2:
+                    // 8XY2: AND Vx, Vy
+                    // Perform bitwise AND on V[X] and V[Y] and store output in V[X]
+                    V[X] &= V[Y];
+                    break;
+                case 0x3:
+                    // 8XY3: XOR Vx, Vy
+                    // Perform bitwise XOR on V[X] and V[Y] and store output in V[X]
+                    V[X] ^= V[Y];
+                    break;
+                case 0x4:
+                    // 8XY4: ADD Vx, Vy
+                    // Add V[X] with V[Y] and store output in V[X]. Set V[F] as the carry
+                    V[X] += V[Y];
+                    // Set the carry flag
+                    if ((int) V[X] + (int) V[Y] > 255) {
+                        V[0xF] = 1;
+                    } else {
+                        V[0xF] = 0;
+                    }
+                    break;
+                case 0x5:
+                    // 8XY5: SUB Vx, Vy
+                    // Subtract V[X] with V[Y] and store output in V[X]. Set V[F] as NOT borrow
+                    V[X] = V[X] - V[Y];
+                    // Set the carry flag
+                    if (V[X] > V[Y]) {
+                        V[0xF] = 1;
+                    } else {
+                        V[0xF] = 0;
+                    }
+                    break;
+                case 0x6:
+                    // 8XY6: SHR Vx {, Vy}
+                    // Shift V[X] right once
+
+                    // OPTIONAL: Some systems first set Vx to Vy before shifting. Make configurable later
+                    // V[X] = V[Y];
+                    V[0xF] = V[X] & 0b1; // Get the last bit (shifted out)
+                    V[X] = V[X] >> 1;
+                    break;
+                case 0x7:
+                    // 8XY7: SUBN Vx, Vy
+                    // Subtract V[Y] with V[X] and store output in V[X]. Set V[F] as NOT borrow
+                    V[X] = V[Y] - V[X];
+                    if (V[Y] > V[X]) {
+                        V[0xF] = 1;
+                    } else {
+                        V[0xF] = 0;
+                    }
+                    break;
+                case 0xE:
+                    // 8XYE: SHL Vx {, Vy}
+                    // Shift V[X] left once
+
+                    // OPTIONAL: Some systems first set Vx to Vy before shifting. Make configurable later
+                    // V[X] = V[Y];
+                    V[0xF] = V[X] >> 7; // Get the first bit (shifted out)
+                    V[X] = V[X] << 1;
+                    break;
+            }
+            break;
+        }
+        
+        case 0x9:
+        {
+            // 9XY0: SNE Vx, Vy
+            // Skip next instruction if V[X] != V[Y]
+            if (V[X] != V[Y]) {
+                ++PC;
+                ++PC;
+            }
+            break;
+        }
         
         case 0xA:
-            // ANNN (set index register I)
+        {
+            // ANNN: LD I, addr
+            // Set index register I = NNN
 
             index_register = NNN;
             break;
+        }
+
+        case 0xB:
+        {
+            // BNNN: JP V0, addr
+            // Jump to instruction at address NNN, plus offset specified by V0
+            PC = NNN + V[0];
+            // Newer Chip8 ISAs use BXNN instead, using X to specify the offset register
+            // Add configurability to specify this offset
+            // PC == NN + V[X];
+            break;
+        }
+
+        case 0xC:
+        {
+            // CXNN: RND Vx, byte
+            // Generate random number, AND with NN, set to V[X}]
+            uint8_t randNum = rand() % 0xFF;
+            V[X] = randNum & NN;
+            break;
+        }
 
         case 0xD:
-            // DXYN (display/draw)
-            // Draw a N-pixels tall sprite at the location specified by Reg X and Reg Y
-            // Sprite drawn specified by the index register
+        {
+            // DXYN: DRW Vx, Vy, nibble
+            // Display/draw n-byte sprite from memory location I at V[X], V[Y]
+            // NOTE: here, screen wrapping is used, but most programs will clip the sprite instead of wrap
             uint8_t x_pos = V[X];
             uint8_t y_pos = V[Y];
+            V[0xF] = 0;
 
-            // Sprite location in memory, specified by index register (index_register)
             // Iterate across character height (5)
             for (int row = 0; row < N; ++row) {
                 uint8_t byte = mem[index_register + row];
@@ -141,16 +319,113 @@ int Chip8::cycle() {
                         int py = (y_pos + row) % CHIP8_HEIGHT;
                         // XOR bitflip to update screen
                         display[py * CHIP8_WIDTH + px] ^= 1;
+                        // Collision detection
+                        if ((display[py * CHIP8_WIDTH + px]) == 0) {
+                            V[0xF] = 1;
+                        }
                     }
                 }
             }
             break;
+        }
+
+        case 0xE:
+        {
+            switch (NN) {
+                case 0x9E:
+                    // EX9E: SKP Vx
+                    // Skip if key press matches V[X]
+                    if (key == V[X]) {
+                        ++PC;
+                        ++PC;
+                    }
+                    break; 
+
+                case 0xA1:
+                    // EXA1: 
+                    // Skip if key press doesn't match V[X]
+                    if (key != V[X]) {
+                        ++PC;
+                        ++PC;
+                    }
+                    break;
+            }
+            break;
+        }
+
+        case 0xF:
+        {
+            switch (NN) {
+                case 0x07:
+                    // FX07: LD Vx, DT
+                    // Set Register VX = delay_timer
+                    V[X] = delay_timer;
+                    break;
+                
+                case 0x0A:
+                    // FX0A: LD Vx, key
+                    // Stop execution, wait for key press, and store value into Vx
+                    V[X] = key;
+                    break;
+
+                case 0x15:
+                    // FX15: LD DT, Vx
+                    // Set delay timer to Register VX
+                    delay_timer = V[X];
+                    break;
+
+                case 0x18:
+                    // FX18: LD ST, Vx
+                    // Set sound timer to Register VX
+                    sound_timer = V[X];
+                    break;
+
+                case 0x1E:
+                    // FX1EADD I, Vx
+                    // Add Vx to index register
+                    index_register += V[X];
+                    break;
+                
+                case 0x29:
+                    // FX29: LD F, Vx
+                    // Set index register to location of sprite corresponding to register VX
+
+                    // Hex sprites start at 0x50
+                    // Each sprite takes 8 bits, so must offset by V[X] (sprite value) x 8 (mem unit)
+                    index_register = 0x50 + V[X] * 8;
+                    break;
+
+                case 0x33:
+                    // FX33: LD B, Vx
+                    // Store BCD representation of V[X] in memory locations I, I+1, and I+2
+                    // I: Hundreds digit
+                    mem[index_register] = V[X] / 100;
+                    // I+1: Tens digit
+                    mem[index_register + 1] = (V[X] % 100) / 10;
+                    // I+2: Ones digit
+                    mem[index_register + 2] = (V[X] % 10);
+                    break;
+
+                case 0x55:
+                    // FX55: LD [I], Vx
+                    // Store V[0]-V[F] in memory, starting at I
+                    for (int i = 0; i < 0xF; ++i) {
+                        mem[index_register + i] = V[i];
+                    }
+                    break;
+
+                case 0x65:
+                    // FX65: LD Vx, [I]
+                    // Read registers V[0]-V[F] from memory, starting at I
+                    for (int i = 0; i < 0xF; ++i) {
+                        V[i] = mem[index_register + i];
+                    }
+                    break;
+            }
+            break;
+        }
     }
 
-    // Timing
-    // Original Chip-8 processors ran around 1MHz, 90's HP calculators at 4MHz
-    //std::this_thread::sleep_for(std::chrono::microseconds(1));    // This will ignore how much time the instructions take
-    
     
     if (instr_count % 1000 == 0) {  // Verify that CPU is cycling=
         printf("1000 Milestone!\n");

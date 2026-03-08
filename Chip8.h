@@ -29,9 +29,13 @@ class Chip8 {
         // Display
         bool display[64 * 32];
 
-        int loadROM();
+        // CPU
+        int loadROM(char* filepath);
         int initMem();
         int cycle();
+
+        // Keypad input
+        uint8_t key;  // Ranges from 0x00 - 0x0F
 
         // Charset        
         static inline constexpr uint8_t chars[80] = {
