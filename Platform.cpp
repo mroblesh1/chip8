@@ -12,6 +12,21 @@ constexpr int CHIP8_WIDTH  = 64;
 constexpr int CHIP8_HEIGHT = 32;
 constexpr int SCALE        = 14;
 
+
+// Audio callback (defines the audio to be played, square wave)
+void AudioCallback(void* userdata, uint8_t* stream, int len) {
+    static uint32_t phase = 0;
+    int16_t* buffer = (int16_t*)stream;
+    int samples = len / sizeof(int16_t);
+
+    for (int i = 0; i < samples; ++i) {
+        // 44100 (Sample Rate) / 440 (Frequency) = ~100 samples per cycle
+        // If phase < 50, high volume. If phase > 50, low volume.
+        buffer[i] = (phase % 100 < 50) ? 3000 : -3000; 
+        phase++;
+    }
+}
+
 Platform::Platform(char const* title, int windowWidth, int windowHeight) {
     SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO);   // Init SDL video and audio subsystem
 
@@ -35,12 +50,34 @@ Platform::Platform(char const* title, int windowWidth, int windowHeight) {
     // Reset OpenGL transformations
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
+
+    // Define the AudioSpecs
+    SDL_AudioSpec wanted, obtained;
+    SDL_zero(wanted);
+    wanted.freq = 44100;    // # of snapshots of sound per second. CD quality
+    wanted.format = AUDIO_S16SYS;   // 16-bit int for sound
+    wanted.channels = 1;
+    wanted.samples = 512;
+    wanted.callback = AudioCallback;    // "Don't call us, we'll call you"
+    // With Callback, SDL pauses the program to request more audio data
+    
+    // Open the audio device
+    audioDevice = SDL_OpenAudioDevice(NULL, 0, &wanted, &obtained, 0);
 }
 
 Platform::~Platform() {
+    SDL_CloseAudioDevice(audioDevice); // Clean up
     SDL_GL_DeleteContext(glContext);
     SDL_DestroyWindow(window);
     SDL_Quit();
+}
+
+void Platform::PlaySound() {
+    SDL_PauseAudioDevice(audioDevice, 0); // 0 means "unpause"
+}
+
+void Platform::StopSound() {
+    SDL_PauseAudioDevice(audioDevice, 1); // 1 means "pause"
 }
 
 void Platform::Update(void const* buffer) {
@@ -67,6 +104,8 @@ void Platform::Update(void const* buffer) {
         }
     }
     glEnd();
+    // Double buffering
+    // Draw on back buffer while still displaying front buffer, buffers swap
     SDL_GL_SwapWindow(window);  // Swap buffers
 }
 

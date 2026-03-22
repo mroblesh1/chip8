@@ -32,14 +32,26 @@ int main(int argc, char** argv) {
         quit = platform.ProcessInput(chip8.keypad);
 
         // 2. Run CPU Cycles
-        // For a smooth experience, run ~10 cycles per frame 
-        // instead of sleeping for 1 microsecond inside the class
-        for(int i = 0; i < 10; i++) {
+        for(int i = 0; i < 12; i++) {
+            // 12 instructions per frame @ 60 fps, or 720 instructions per second (720 ips)
+            // Guide recommends 700 ips as a starting point, so this is good
             chip8.cycle();
+
+            // Only 1 draw instruction per frame
+            if (chip8.read_type() == 0xD) {
+                break;
+            }
         }
 
         // 3. Update timers
         chip8.updateTimers();
+
+        // Audio Logic
+        if (chip8.readSoundTimer() > 0) {
+            platform.PlaySound();
+        } else {
+            platform.StopSound();
+        }
 
         // 4. Update Graphics
         // We pass the address of chip8's internal display array

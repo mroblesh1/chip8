@@ -1,4 +1,5 @@
 //#define MAIN
+#define OLD
 
 // Header
 #include "Chip8.h"
@@ -87,6 +88,18 @@ void Chip8::updateTimers() {
         --soundTimer;
         // Trigger beep sound while > 0
     }
+}
+
+uint8_t Chip8::readDelayTimer() {
+    return delayTimer;
+}
+
+uint8_t Chip8::readSoundTimer() {
+    return soundTimer;
+}
+
+uint8_t Chip8::read_type() {
+    return (mem[PC - 2] & 0xF0) >> 2;   // Decrement by 2 because this will be run after current instruction has been incremented
 }
 
 int Chip8::cycle() {
@@ -275,7 +288,9 @@ int Chip8::cycle() {
                     // Shift V[X] right once
 
                     // OPTIONAL: Some systems first set Vx to Vy before shifting. Make configurable later
-                    // V[X] = V[Y];
+#ifdef OLD
+                    V[X] = V[Y];
+#endif
                     
                     // First, store what the carry value should be
                     // We do this separately because V[X] could possibly be V[F]
@@ -310,7 +325,9 @@ int Chip8::cycle() {
                     // Shift V[X] left once
 
                     // OPTIONAL: Some systems first set Vx to Vy before shifting. Make configurable later
-                    // V[X] = V[Y];
+#ifdef OLD
+                    V[X] = V[Y];
+#endif
                     
                     // First, store what the carry value should be
                     // We do this separately because V[X] could possibly be V[F]
@@ -504,18 +521,30 @@ int Chip8::cycle() {
                 {
                     // FX55: LD [I], Vx
                     // Store V[0]-V[F] in memory, starting at I
+#ifdef OLD
                     for (int i = 0; i <= X; ++i) {
                         mem[index_register++] = V[i];
                     }
+#else
+                    for (int i = 0; i <= X; ++i) {
+                        mem[index_register + i] = V[i];
+                    }
+#endif
                 } break;
 
                 case 0x65:
                 {
                     // FX65: LD Vx, [I]
                     // Read registers V[0]-V[F] from memory, starting at I
+#ifdef OLD
                     for (int i = 0; i <= X; ++i) {
                         V[i] = mem[index_register++];
                     }
+#else
+                    for (int i = 0; i <= X; ++i) {
+                        V[i] = mem[index_register + i];
+                    }
+#endif
                 } break;
             }
             break;

@@ -34,6 +34,11 @@ class Chip8 {
         int initMem();
         int cycle();
         void updateTimers();
+        uint8_t readDelayTimer();
+        uint8_t readSoundTimer();
+
+        // Reading out instruction type
+        uint8_t read_type();
 
         // Keypad input
         uint8_t keypad[16];  // Ranges from 0x00 - 0x0F
