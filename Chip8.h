@@ -13,8 +13,8 @@ class Chip8 {
         std::stack<std::uint16_t> stack;    // Stack
 
         // Timers
-        uint8_t delay_timer;
-        uint8_t sound_timer;
+        uint8_t delayTimer;
+        uint8_t soundTimer;
         
         // Instruction counter, if doing that method
         uint16_t instr_count;
@@ -33,9 +33,10 @@ class Chip8 {
         int loadROM(char* filepath);
         int initMem();
         int cycle();
+        void updateTimers();
 
         // Keypad input
-        uint8_t key;  // Ranges from 0x00 - 0x0F
+        uint8_t keypad[16];  // Ranges from 0x00 - 0x0F
 
         // Charset        
         static inline constexpr uint8_t chars[80] = {

@@ -1,3 +1,5 @@
+#define DEBUG
+
 #include "Chip8.h"
 #include "Platform.h"
 
@@ -6,25 +8,28 @@
 
 constexpr int CHIP8_WIDTH  = 64;
 constexpr int CHIP8_HEIGHT = 32;
-constexpr int SCALE        = 10;
+constexpr int SCALE        = 14;
 
 int main(int argc, char** argv) {
     Chip8 chip8;
     Platform platform("CHIP-8 Emulator", CHIP8_WIDTH * SCALE, CHIP8_HEIGHT * SCALE);
+
+    if (argc != 2) {
+        printf("Please enter one ROM\n");
+        return -1;
+    }
+
+    char* ROM = argv[1];
     
 
-    chip8.loadROM("./ROMs/4-flags.ch8");
+    chip8.loadROM(ROM);
 
     bool quit = false;
 
-    int i = 0;  // just for program termination
 
     while (!quit) {
         // 1. Handle Input
-        // quit = platform.ProcessInput(chip8.keypad);
-        if (i > 300) {
-            break;
-        }
+        quit = platform.ProcessInput(chip8.keypad);
 
         // 2. Run CPU Cycles
         // For a smooth experience, run ~10 cycles per frame 
@@ -33,14 +38,16 @@ int main(int argc, char** argv) {
             chip8.cycle();
         }
 
-        // 3. Update Graphics
+        // 3. Update timers
+        chip8.updateTimers();
+
+        // 4. Update Graphics
         // We pass the address of chip8's internal display array
         platform.Update(chip8.display);
 
-        // 4. Cap Frame Rate (~60 FPS)
+        // 5. Cap Frame Rate (~60 FPS)
         SDL_Delay(16); 
 
-        i++;
     }
 
     return 0;
