@@ -29,3 +29,21 @@ $(TARGET): $(OBJ)
 # 5. Clean - Removes the build files to start fresh
 clean:
 	rm -f $(OBJ) $(TARGET)
+
+
+
+# BONUS: To compile into html using emcc, with only the tetris ROM, run the following command
+# 	emcc main.cpp chip8.cpp Platform.cpp \
+#     	-s USE_SDL=2 \
+#     	-s LEGACY_GL_EMULATION=1 \
+#     	--embed-file ROMs/ \
+#		--pre-js config.js \
+#     	-o Chip8.html
+
+# For multi-select, run the following
+# 	emcc main.cpp chip8.cpp Platform.cpp \
+#     	-s USE_SDL=2 \
+#     	-s LEGACY_GL_EMULATION=1 \
+# 		-s INVOKE_RUN=0 \
+#     	--embed-file ROMs/ \
+#     	-o Chip8.html
